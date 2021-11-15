@@ -25,7 +25,8 @@ class AuthController extends Controller
         $this->validate($request, [
             //'nim' => 'required',
             'email' => 'required|email:dns',
-            'password' => 'required|min:8'
+            'password' => 'required|min:8',
+            //'number' => 'required'
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -40,7 +41,7 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => false,
-            'message' => 'Email atau Password tidak sesuai',
+            'message' => 'Number atau Password tidak sesuai',
             'data' => '',
         ], 404);
     }
@@ -51,7 +52,8 @@ class AuthController extends Controller
             'nim' => 'required|unique:users',
             'name' => 'required',
             'password' => 'required|min:8',
-            'email' => 'required|email:dns|unique:users'
+            'email' => 'required|email:dns|unique:users',
+            'number' => 'required'
         ]);
 
         $user = User::create([
@@ -65,7 +67,8 @@ class AuthController extends Controller
             'name' => $request->name,
             'password' => Hash::make($request->password),
             'email' => $request -> email,
-            'role' => $request->role
+            'role' => $request->role,
+            'number' => $request->number
         ]);
         $user->assignRole($request->role);
         $decrypted = array(
@@ -73,7 +76,8 @@ class AuthController extends Controller
             'name' => $user->name,
             'password' => $user->password,
             'email' => $user->email,
-            'role' => $user->role
+            'role' => $user->role,
+            'number' => $request->number
         );
 
         if ($user) {
@@ -125,6 +129,7 @@ class AuthController extends Controller
             'nim' => $request->nim ? 'required' : '',
             'name' => $request->name ? 'required' : '',
             'password' => $request->password ? 'required|min:8' : '',
+            'number' => $request->number ? 'required' : '',
         ]);
 
         $user = User::find($id);
@@ -132,6 +137,7 @@ class AuthController extends Controller
         $user->name = $request->name ? $request->name : $user->name;
         $user->password = $request->password ? Hash::make($request->password) : Hash::make($user->password);
         $user->email = $request->email ? $request->email : $user->email;
+        $user->number = $request->number ? $request->number : $user->number;
         $user->save();
         return response()->json([
             'status' => true,
@@ -216,4 +222,114 @@ class AuthController extends Controller
             'message' => 'Email tidak terdaftar'
         ], 404);
     }
+
+    public function sendsms(Request $request)
+    {
+        $this->validate($request, [
+            'number' => 'required'
+        ]);
+
+        $user = User::where('number', $request->number)->first();
+
+        if ($user) {
+            $otp = Str::random(6);
+            $kode = Str::random(32);
+            $data = ["code" => $otp];
+            $basic  = new \Vonage\Client\Credentials\Basic("74ddb9f3", "o0h3oyn8H2dTUV5l");
+            $client = new \Vonage\Client($basic);
+            $cek = ResetPassword::where('number', $user->number)->first();
+            if ($cek) {
+                $cek->otp = $otp;
+                $cek->save();
+                $response = $client->sms($data)->send(
+                    new \Vonage\SMS\Message\SMS("6285713493551", 'SMS GATEWAY', 'KODE OTP',$data)
+                );
+                $message = $response->current();
+
+                if ($message->getStatus() == 0) {
+                    return response()->json([
+                        'status' => true,
+                        'message' => 'The message was sent successfully',
+                    ], 200);
+                } else {
+                    return response()->json([
+                        'status' => false,
+                        'message' => "The message failed with status: " . $message->getStatus() . "\n"
+                    ], 400);
+                }
+            }
+
+            ResetPassword::create([
+                'number' => $user->number,
+                'otp' => $otp,
+                'email' => $user->email,
+                'token' => $kode
+            ]);
+
+            $response = $client->sms()->send(
+                new \Vonage\SMS\Message\SMS("6285713493551", 'SMS GATEWAY', 'KODE OTP', $data)
+            );
+            return response()->json([
+                'status' => true,
+                'message' => 'Cek SMS untuk mendapatkan kode otp'
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'Nomor tidak terdaftar'
+        ], 404);
+
+
+        // $basic  = new \Vonage\Client\Credentials\Basic("74ddb9f3", "o0h3oyn8H2dTUV5l");
+        // $client = new \Vonage\Client($basic);
+        // $response = $client->sms()->send(
+        //     new \Vonage\SMS\Message\SMS("6285713493551", 'SMS GATEWAY', 'Percobaan sms gateway')
+        // );
+
+        // $message = $response->current();
+
+        // if ($message->getStatus() == 0) {
+        //     return response()->json([
+        //         'status' => true,
+        //         'message' => 'The message was sent successfully',
+        //     ], 200);
+        // } else {
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => "The message failed with status: " . $message->getStatus() . "\n"
+        //     ], 400);
+        // }
+    }
+
+    public function resetsms(Request $request)
+    {
+        $this->validate($request, [
+            'number' => 'required',
+            'password' => 'required|min:8'
+        ]);
+
+        $user = User::where('number', $request->number)->first();
+        if ($user) {
+            $reset = ResetPassword::where('number', $user->number)->first();
+            if ($user->number == $reset->number && $reset->otp == $request->header('otp')) {
+                $user->password = Hash::make($request->password);
+                $user->save();
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Password sudah direset, Silahkan login dengan password baru'
+                ], 200);
+            }
+            return response()->json([
+                'status' => false,
+                'message' => 'Nomor atau token tidak valid'
+            ], 404);
+        }
+        return response()->json([
+            'status' => false,
+            'message' => 'Nomor tidak terdaftar'
+        ], 404);
+    }
+
+    
 }

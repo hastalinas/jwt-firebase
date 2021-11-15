@@ -35,6 +35,8 @@ $router->group(['prefix' => 'auth'], function () use ($router) {
     $router->get('me', 'AuthController@me');
     $router->post('reset/sendmail', 'AuthController@sendmail');
     $router->post('reset/password', ['middleware' => 'token', 'uses' => 'AuthController@reset']);
+    $router->post('resetsms/sendsms', 'AuthController@sendsms');
+    $router->post('resetsms/password', ['middleware' => 'otp', 'uses' => 'AuthController@resetsms']);
 
     //role untuk mahasiswa dan admin
     $router->post('logout', 'AuthController@logout');
@@ -52,3 +54,25 @@ $router->group(['prefix' => 'auth'], function () use ($router) {
 });
 
 
+// route send message
+//$router->get('/sms', function () use ($router) {
+    // $basic  = new \Vonage\Client\Credentials\Basic("74ddb9f3", "o0h3oyn8H2dTUV5l");
+    // $client = new \Vonage\Client($basic);
+    // $response = $client->sms()->send(
+    //     new \Vonage\SMS\Message\SMS("6285713493551", 'SMS GATEWAY', 'Percobaan sms gateway')
+    // );
+
+    // $message = $response->current();
+
+    // if ($message->getStatus() == 0) {
+    //     return response()->json([
+    //         'status' => true,
+    //         'message' => 'The message was sent successfully',
+    //     ], 200);
+    // } else {
+    //     return response()->json([
+    //         'status' => false,
+    //         'message' => "The message failed with status: " . $message->getStatus() . "\n"
+    //     ], 400);
+    // }
+//});

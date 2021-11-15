@@ -11,6 +11,8 @@
         "guzzlehttp/guzzle": "^7.4",
         "illuminate/mail": "^8.69",
         "laravel/lumen-framework": "^8.3.1",
+        "nexmo/client-core": "^2.9",
+        "nexmo/laravel": "^2.4",
         "s-ichikawa/laravel-sendgrid-driver": "^3.0",
         "spatie/laravel-permission": "^5.3"
     },
